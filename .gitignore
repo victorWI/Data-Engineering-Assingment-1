@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.myenv/
+*.pyc
+# produced by the CI/CD pipelines, never committed
+ml-pipeline/coffee_training_pipeline.yaml
+prediction-api/model.pkl
+prediction-api/metadata.json
+*_test_log.xml
+training_data.csv
+parameters.json

@@ -1,0 +1,19 @@
+# CI/CD 0 - Build the custom "pipeline-executor" Cloud Build tool.
+# Run once (manual trigger), and again only if builder-tools/ changes.
+# The image is used by training-cicd.yaml to submit the training pipeline to Vertex AI.
+steps:
+  - id: build-executor
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/pipeline-executor:0.0.1",
+           "./builder-tools/pipeline-executor"]
+
+  - id: push-executor
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/pipeline-executor:0.0.1"]
+
+substitutions:
+  _LOCATION: us-central1
+  _REPOSITORY: coffee-repo
+
+options:
+  logging: CLOUD_LOGGING_ONLY

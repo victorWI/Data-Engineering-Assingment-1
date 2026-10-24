@@ -1,0 +1,90 @@
+# CI/CD 1 - Continuous training (training operationalization).
+#
+# Triggered by a push that changes data/incoming/** (new tasting data) or ml-pipeline/**
+# (new pipeline code), or run manually / on a schedule.
+#   1. test the pipeline code
+#   2. compile the pipeline to YAML and store a versioned copy in Cloud Storage
+#   3. merge all data batches in data/incoming/ and upload them to the data bucket
+#   4. submit the pipeline to Vertex AI and wait for it to finish
+# If the pipeline publishes a better model, that upload fires the deployment pipeline
+# (model-deployment-cicd.yaml) through a Pub/Sub notification on the model bucket.
+steps:
+  - id: test-pipeline
+    name: python:3.12.7
+    entrypoint: /bin/sh
+    args:
+      - -c
+      - |
+        cd ml-pipeline &&
+        python -m venv .venv && . .venv/bin/activate &&
+        pip install -q --upgrade pip && pip install -q -r requirements.txt &&
+        python -m pytest -q tests
+
+  - id: compile-pipeline
+    name: python:3.12.7
+    entrypoint: /bin/sh
+    args:
+      - -c
+      - |
+        cd ml-pipeline && . .venv/bin/activate &&
+        python coffee_training_pipeline.py --target_file coffee_training_pipeline.yaml
+    waitFor: ["test-pipeline"]
+
+  - id: upload-pipeline
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        gcloud storage cp ml-pipeline/coffee_training_pipeline.yaml gs://${_TEMP_REPO}/pipelines/coffee_training_pipeline_${BUILD_ID}.yaml &&
+        gcloud storage cp ml-pipeline/coffee_training_pipeline.yaml gs://${_TEMP_REPO}/pipelines/coffee_training_pipeline_latest.yaml
+    waitFor: ["compile-pipeline"]
+
+  - id: upload-data
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        # concatenate every batch file, keeping only the first header line
+        awk 'FNR==1 && NR!=1 {next} {print}' data/incoming/*.csv > training_data.csv &&
+        echo "Training rows (incl. header): $(wc -l < training_data.csv) from: $(ls data/incoming)" &&
+        gcloud storage cp training_data.csv gs://${_DATA_REPO}/training_data.csv
+    waitFor: ["-"]
+
+  - id: write-parameters
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        cat > parameters.json <<EOF
+        {"project_id": "$PROJECT_ID", "data_bucket": "${_DATA_REPO}",
+         "trainset_filename": "training_data.csv", "model_repo": "${_MODEL_REPO}",
+         "test_size": 0.2, "min_improvement": 0.0}
+        EOF
+        cat parameters.json
+    waitFor: ["-"]
+
+  - id: run-pipeline
+    name: ${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/pipeline-executor:0.0.1
+    args:
+      - --name=coffee-training-${BUILD_ID}
+      - --pipeline_def=ml-pipeline/coffee_training_pipeline.yaml
+      - --pipeline_root=gs://${_TEMP_REPO}/pipeline-root
+      - --parameter_dict=parameters.json
+      - --project=$PROJECT_ID
+      - --region=${_LOCATION}
+    waitFor: ["upload-pipeline", "upload-data", "write-parameters"]
+
+substitutions:
+  _LOCATION: us-central1
+  _REPOSITORY: coffee-repo
+  _DATA_REPO: change-me-data-bucket
+  _MODEL_REPO: change-me-model-bucket
+  _TEMP_REPO: change-me-temp-bucket
+
+# Vertex AI training takes ~10-15 minutes; the Cloud Build default timeout is 10 minutes.
+timeout: 3600s
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,107 @@
+# CI/CD 2 - Continuous deployment of the model and the serving application.
+#
+# Used by two triggers:
+#   * Pub/Sub trigger: fires when the training pipeline publishes gs://<model bucket>/production/model.pkl
+#   * GitHub push trigger: fires when prediction-api/** or prediction-ui/** changes
+# Steps: test the new model with the API unit tests -> build, push and deploy the API ->
+# build, push and deploy the UI (pointing at the API URL) -> smoke-test the live API.
+steps:
+  - id: get-model-for-tests
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ["storage", "cp", "gs://${_MODEL_REPO}/production/model.pkl", "./prediction-api/testResources/model.pkl"]
+
+  - id: test-api
+    name: python:3.12.7
+    entrypoint: /bin/sh
+    args:
+      - -c
+      - |
+        cd prediction-api &&
+        python -m venv .venv && . .venv/bin/activate &&
+        pip install -q --upgrade pip && pip install -q -r requirements.txt &&
+        python -m pytest -q --junitxml=${BUILD_ID}_test_log.xml tests
+
+  - id: package-model
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        gcloud storage cp gs://${_MODEL_REPO}/production/model.pkl ./prediction-api/model.pkl &&
+        gcloud storage cp gs://${_MODEL_REPO}/production/metadata.json ./prediction-api/metadata.json
+
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-api:${BUILD_ID}",
+           "./prediction-api"]
+
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-api:${BUILD_ID}"]
+
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ["run", "deploy", "coffee-prediction-api",
+           "--image", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-api:${BUILD_ID}",
+           "--region", "${_LOCATION}", "--platform", "managed", "--port", "5000",
+           "--cpu", "1", "--memory", "1Gi", "--max-instances", "2", "--allow-unauthenticated"]
+
+  - id: get-api-url
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        gcloud run services describe coffee-prediction-api --region ${_LOCATION} \
+          --format='value(status.url)' > /workspace/api_url.txt && cat /workspace/api_url.txt
+
+  - id: build-ui
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-ui:${BUILD_ID}",
+           "./prediction-ui"]
+    waitFor: ["-"]
+
+  - id: push-ui
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-ui:${BUILD_ID}"]
+    waitFor: ["build-ui"]
+
+  - id: deploy-ui
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        gcloud run deploy coffee-prediction-ui \
+          --image ${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/coffee-prediction-ui:${BUILD_ID} \
+          --set-env-vars PREDICTOR_API=$(cat /workspace/api_url.txt)/coffee_predictor/ \
+          --region ${_LOCATION} --platform managed --port 5000 \
+          --cpu 1 --memory 512Mi --max-instances 2 --allow-unauthenticated
+    waitFor: ["push-ui", "get-api-url"]
+
+  - id: smoke-test
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: /bin/bash
+    args:
+      - -c
+      - |
+        API=$(cat /workspace/api_url.txt)
+        curl -sf $$API/health && echo &&
+        curl -sf -X POST -H "Content-Type: application/json" \
+          --data @prediction-api/testResources/prediction_request.json $$API/coffee_predictor/
+    waitFor: ["deploy-ui"]
+
+substitutions:
+  _LOCATION: us-central1
+  _REPOSITORY: coffee-repo
+  _MODEL_REPO: change-me-model-bucket
+
+artifacts:
+  objects:
+    location: gs://${_MODEL_REPO}/build-logs/
+    paths: ["/workspace/api_url.txt", "prediction-api/${BUILD_ID}_test_log.xml"]
+
+options:
+  logging: CLOUD_LOGGING_ONLY

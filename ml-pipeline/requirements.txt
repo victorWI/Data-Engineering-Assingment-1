@@ -1,0 +1,7 @@
+kfp>=2.9,<3
+google-cloud-aiplatform
+google-cloud-storage==2.18.2
+pandas==2.2.3
+scikit-learn==1.5.2
+pytest
+pyyaml

@@ -1,0 +1,10 @@
+[
+  {"temperature": 3, "flavor_intensity": 3, "acidity": 3, "mouthfeel": 3,
+   "tea_floral": 0, "fruit": 0, "citrus": 0, "green_veg": 0, "paper_wood": 0, "burnt": 0,
+   "cereal": 0, "nutty": 1, "dark_chocolate": 1, "caramel": 1, "bitter": 0, "astringent": 0,
+   "roasted": 1, "sour": 0, "thick_viscous": 0, "sweet": 1, "rubber": 0},
+  {"temperature": 3, "flavor_intensity": 1, "acidity": 5, "mouthfeel": 1,
+   "tea_floral": 0, "fruit": 0, "citrus": 1, "green_veg": 1, "paper_wood": 1, "burnt": 0,
+   "cereal": 0, "nutty": 0, "dark_chocolate": 0, "caramel": 0, "bitter": 1, "astringent": 1,
+   "roasted": 0, "sour": 1, "thick_viscous": 0, "sweet": 0, "rubber": 1}
+]
