@@ -3,97 +3,187 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2b1d16">
   <title>Will I like this coffee?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#f6f1ea; --card:#fffdf9; --ink:#2b1d14; --muted:#7a6656; --line:#e6dbcd;
-            --accent:#7b4a2a; --accent-soft:#f0e3d4; --good:#2f7d4f; --bad:#a3402f; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--ink);
-           font:16px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    main { max-width:760px; margin:0 auto; padding:32px 16px 64px; }
-    h1 { font-size:28px; margin:0 0 4px; letter-spacing:-0.01em; }
-    .lead { color:var(--muted); margin:0 0 24px; }
-    section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px; }
-    h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; }
-    .q { margin-bottom:16px; } .q:last-child { margin-bottom:0; }
-    .q-label { font-weight:600; margin-bottom:6px; }
-    .scale { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
-    .scale input, .chips input { position:absolute; opacity:0; pointer-events:none; }
-    .scale label { display:block; text-align:center; font-size:13px; padding:8px 4px; border:1px solid var(--line);
-                   border-radius:8px; cursor:pointer; background:#fff; line-height:1.25; }
-    .scale input:checked + label { background:var(--accent); border-color:var(--accent); color:#fff; }
-    .scale input:focus-visible + label, .chips input:focus-visible + label { outline:2px solid var(--accent); outline-offset:2px; }
-    .chips { display:flex; flex-wrap:wrap; gap:8px; }
-    .chips label { padding:7px 12px; border:1px solid var(--line); border-radius:999px; cursor:pointer; background:#fff; font-size:14px; }
-    .chips input:checked + label { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
-    button { width:100%; padding:14px; font-size:16px; font-weight:600; border:0; border-radius:12px;
-             background:var(--accent); color:#fff; cursor:pointer; }
-    button:hover { filter:brightness(1.08); }
-    .result { text-align:center; padding:28px 20px; }
-    .verdict { font-size:26px; font-weight:700; margin:0 0 4px; }
-    .verdict.good { color:var(--good); } .verdict.bad { color:var(--bad); } .verdict.unsure { color:var(--accent); }
-    .meter { height:10px; background:var(--line); border-radius:999px; overflow:hidden; margin:14px auto 6px; max-width:360px; }
-    .meter span { display:block; height:100%; background:var(--accent); }
-    .small { color:var(--muted); font-size:13px; }
-    .error { color:var(--bad); }
-    @media (max-width:520px) { .scale { grid-template-columns:1fr; } .scale label { text-align:left; } }
+    /* Dark-roast palette: one surface family, crema-coloured text, one caramel accent.
+       Shapes: panels 20px, everything interactive is a full pill. */
+    :root {
+      --roast: #2b1d16;     /* page */
+      --bean: #3a2820;      /* raised surface */
+      --grind: #4d372c;     /* lines, idle controls */
+      --crema: #efe2d0;     /* text */
+      --husk: #b39d8a;      /* secondary text */
+      --caramel: #e2b27f;   /* the one accent */
+      --font: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; min-height: 100dvh; background: var(--roast); color: var(--crema);
+      font: 400 16px/1.5 var(--font); font-optical-sizing: auto;
+    }
+    .page {
+      max-width: 1080px; margin: 0 auto; padding: 48px 24px 64px;
+      display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 56px; align-items: start;
+    }
+    h1 { grid-column: 1 / -1; margin: 0; font-size: clamp(28px, 4vw, 40px); font-weight: 800;
+         line-height: 1.05; letter-spacing: -0.02em; }
+
+    /* ---------- form ---------- */
+    form { display: grid; gap: 40px; }
+    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+    legend { padding: 0; margin-bottom: 18px; color: var(--husk); font-size: 15px; }
+
+    .scales { display: grid; gap: 22px; }
+    .scale { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 16px; }
+    .scale-name { font-weight: 500; }
+    .steps { display: grid; grid-template-columns: 52px repeat(5, 1fr) 52px; align-items: center; gap: 6px; }
+    .end { color: var(--husk); font-size: 13px; }
+    .end:last-child { padding-left: 4px; }
+    .step { position: relative; display: block; height: 36px; }
+    .step input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+    .step span {
+      display: block; height: 100%; border-radius: 999px; background: var(--bean);
+      border: 1px solid var(--grind); transition: background .15s ease, border-color .15s ease;
+    }
+    .step.mid span { border-color: var(--husk); }       /* "just right" is marked by its outline */
+    .step input:hover + span { border-color: var(--caramel); }
+    .step input:checked + span { background: var(--caramel); border-color: var(--caramel); }
+    .step input:focus-visible + span { outline: 2px solid var(--crema); outline-offset: 3px; }
+
+    .notes { display: flex; flex-wrap: wrap; gap: 8px; }
+    .note { position: relative; }
+    .note input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+    .note span {
+      display: inline-block; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--grind);
+      font-size: 15px; transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    .note input:hover + span { border-color: var(--caramel); }
+    .note input:checked + span { background: var(--crema); color: var(--roast); border-color: var(--crema); font-weight: 500; }
+    .note input:focus-visible + span { outline: 2px solid var(--caramel); outline-offset: 3px; }
+
+    button {
+      justify-self: start; padding: 15px 40px; border: 0; border-radius: 999px; cursor: pointer;
+      background: var(--caramel); color: var(--roast); font: 700 17px/1 var(--font);
+      transition: transform .1s ease, filter .15s ease;
+    }
+    button:hover { filter: brightness(1.06); }
+    button:active { transform: translateY(1px) scale(.99); }
+    button:focus-visible { outline: 2px solid var(--crema); outline-offset: 3px; }
+
+    /* ---------- result ---------- */
+    .result {
+      position: sticky; top: 32px; background: var(--bean); border-radius: 20px; padding: 32px;
+      min-height: 300px; display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .pct {
+      font-size: clamp(88px, 12vw, 132px); font-weight: 800; line-height: .9; letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .pct small { font-size: .42em; letter-spacing: 0; margin-left: 4px; color: var(--husk); }
+    .verdict { margin: 18px 0 6px; font-size: 26px; font-weight: 700; line-height: 1.15; }
+    .verdict.like { color: var(--caramel); }
+    .caption { margin: 0; color: var(--husk); font-size: 14px; }
+    .empty { color: var(--husk); font-size: 20px; line-height: 1.35; max-width: 16ch; margin: 0; }
+    .error { color: var(--crema); }
+
+    footer { grid-column: 1 / -1; color: var(--husk); font-size: 13px; }
+
+    @media (max-width: 860px) {
+      .page { grid-template-columns: 1fr; gap: 32px; padding: 28px 16px 48px; }
+      .result { position: static; order: -1; min-height: 0; padding: 24px; }
+      h1 { order: -2; }
+      .scale { grid-template-columns: 1fr; gap: 8px; }
+      button { justify-self: stretch; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
   </style>
 </head>
 <body>
-<main>
+<main class="page">
   <h1>Will I like this coffee?</h1>
-  <p class="lead">Take a sip, describe what you taste, and the model predicts whether you'll enjoy the cup.</p>
-
-  {% if result %}
-  <section class="result" aria-live="polite">
-    {% if result.verdict == "like" %}
-      <p class="verdict good">You'll probably like this one</p>
-    {% elif result.verdict == "dislike" %}
-      <p class="verdict bad">Probably not your cup</p>
-    {% else %}
-      <p class="verdict unsure">Hard to say</p>
-      <p class="small">Your description doesn't point clearly either way.</p>
-    {% endif %}
-    <div class="meter" role="img" aria-label="{{ (result.probability * 100)|round|int }}% chance you like it">
-      <span style="width: {{ (result.probability * 100)|round|int }}%"></span>
-    </div>
-    <p class="small">{{ (result.probability * 100)|round|int }}% chance you'd rate it 6 or higher out of 9</p>
-  </section>
-  {% elif error %}
-  <section class="result"><p class="error">{{ error }}</p></section>
-  {% endif %}
 
   <form action="/checkcoffee" method="POST">
-    <section>
-      <h2>How does it taste?</h2>
-      {% for key, label, options in jar %}
-      <div class="q" role="radiogroup" aria-label="{{ label }}">
-        <div class="q-label">{{ label }}</div>
-        <div class="scale">
-          {% for opt in options %}
-            {% set v = loop.index %}
-            <input type="radio" id="{{ key }}{{ v }}" name="{{ key }}" value="{{ v }}"
-                   {% if (selected and selected[key] == v) or (not selected and v == 3) %}checked{% endif %}>
-            <label for="{{ key }}{{ v }}">{{ opt }}</label>
-          {% endfor %}
+    <fieldset>
+      <legend>How does it taste?</legend>
+      <div class="scales">
+        {% for key, label, options, low, high in jar %}
+        <div class="scale" role="radiogroup" aria-label="{{ label }}">
+          <span class="scale-name">{{ label }}</span>
+          <div class="steps">
+            <span class="end" aria-hidden="true">{{ low }}</span>
+            {% for opt in options %}
+              {% set v = loop.index %}
+              <label class="step{% if v == 3 %} mid{% endif %}">
+                <input type="radio" name="{{ key }}" value="{{ v }}" aria-label="{{ label }}: {{ opt }}"
+                       {% if (selected and selected[key] == v) or (not selected and v == 3) %}checked{% endif %}>
+                <span></span>
+              </label>
+            {% endfor %}
+            <span class="end" aria-hidden="true">{{ high }}</span>
+          </div>
         </div>
-      </div>
-      {% endfor %}
-    </section>
-
-    <section>
-      <h2>What flavours do you notice?</h2>
-      <div class="chips">
-        {% for key, label in flavours %}
-          <input type="checkbox" id="{{ key }}" name="{{ key }}" value="1" {% if selected and selected[key] %}checked{% endif %}>
-          <label for="{{ key }}">{{ label }}</label>
         {% endfor %}
       </div>
-    </section>
+    </fieldset>
+
+    <fieldset>
+      <legend>What do you notice?</legend>
+      <div class="notes">
+        {% for key, label in flavours %}
+          <label class="note">
+            <input type="checkbox" name="{{ key }}" value="1" {% if selected and selected[key] %}checked{% endif %}>
+            <span>{{ label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
 
     <button type="submit">Predict</button>
   </form>
-  <p class="small" style="margin-top:20px">Model trained on the UC Davis consumer coffee study (Cotter, Ristenpart &amp; Guinard, 2022).</p>
+
+  <aside class="result" aria-live="polite">
+    {% if result %}
+      {% set pct = (result.probability * 100)|round|int %}
+      <div class="pct"><span data-count="{{ pct }}">{{ pct }}</span><small>%</small></div>
+      {% if result.verdict == "like" %}
+        <p class="verdict like">You'll likely enjoy it</p>
+      {% elif result.verdict == "dislike" %}
+        <p class="verdict">Probably not for you</p>
+      {% else %}
+        <p class="verdict">Hard to say</p>
+      {% endif %}
+      <p class="caption">Chance you'd rate it 6 or more out of 9</p>
+    {% elif error %}
+      <p class="empty error">{{ error }} Try again in a moment.</p>
+    {% else %}
+      <p class="empty">Describe your cup to see the prediction.</p>
+    {% endif %}
+  </aside>
+
+  <footer>Trained on the UC Davis consumer coffee study (Cotter, Ristenpart &amp; Guinard, 2022).</footer>
 </main>
+
+<script>
+  // One motion moment: the percentage counts up when a result arrives (skipped for reduced motion).
+  (function () {
+    var el = document.querySelector("[data-count]");
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var target = +el.dataset.count, start = null, dur = 700;
+    function tick(t) {
+      if (start === null) start = t;
+      var p = Math.min((t - start) / dur, 1), eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased);
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
+</script>
 </body>
 </html>
