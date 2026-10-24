@@ -31,7 +31,7 @@
     button:hover { filter:brightness(1.08); }
     .result { text-align:center; padding:28px 20px; }
     .verdict { font-size:26px; font-weight:700; margin:0 0 4px; }
-    .verdict.good { color:var(--good); } .verdict.bad { color:var(--bad); }
+    .verdict.good { color:var(--good); } .verdict.bad { color:var(--bad); } .verdict.unsure { color:var(--accent); }
     .meter { height:10px; background:var(--line); border-radius:999px; overflow:hidden; margin:14px auto 6px; max-width:360px; }
     .meter span { display:block; height:100%; background:var(--accent); }
     .small { color:var(--muted); font-size:13px; }
@@ -46,10 +46,13 @@
 
   {% if result %}
   <section class="result" aria-live="polite">
-    {% if result.liked %}
+    {% if result.verdict == "like" %}
       <p class="verdict good">You'll probably like this one</p>
-    {% else %}
+    {% elif result.verdict == "dislike" %}
       <p class="verdict bad">Probably not your cup</p>
+    {% else %}
+      <p class="verdict unsure">Hard to say</p>
+      <p class="small">Your description doesn't point clearly either way.</p>
     {% endif %}
     <div class="meter" role="img" aria-label="{{ (result.probability * 100)|round|int }}% chance you like it">
       <span style="width: {{ (result.probability * 100)|round|int }}%"></span>

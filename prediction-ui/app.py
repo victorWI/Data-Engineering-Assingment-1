@@ -24,6 +24,21 @@ FLAVOURS = [
 ]
 
 
+# The model's probability is turned into one of three verdicts. About 61% of all cups in the
+# study were liked, so probabilities close to that carry little information: in that middle band
+# the UI says "Hard to say" instead of overstating a borderline prediction.
+LIKE_THRESHOLD = 0.65
+DISLIKE_THRESHOLD = 0.40
+
+
+def verdict_for(probability):
+    if probability >= LIKE_THRESHOLD:
+        return "like"
+    if probability < DISLIKE_THRESHOLD:
+        return "dislike"
+    return "unsure"
+
+
 def form_to_record(form):
     record = {key: int(form.get(key, 3)) for key, _, _ in JAR_QUESTIONS}
     record.update({key: 1 if form.get(key) else 0 for key, _ in FLAVOURS})
@@ -43,6 +58,7 @@ def check_coffee():
         res = requests.post(os.environ["PREDICTOR_API"], json=[record], timeout=30)
         res.raise_for_status()
         result, error = res.json()[0], None
+        result["verdict"] = verdict_for(result["probability"])
     except Exception as e:  # show a friendly message instead of a server error
         app.logger.exception("Prediction API call failed")
         result, error = None, f"The prediction service could not be reached ({type(e).__name__})."
