@@ -1,1 +1,3 @@
 google-cloud-aiplatform
+# needed to read the compiled pipeline YAML (no longer installed automatically with aiplatform)
+pyyaml
