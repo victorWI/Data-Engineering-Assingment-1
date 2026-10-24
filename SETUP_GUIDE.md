@@ -55,8 +55,10 @@ echo "$PROJECT_ID / $DATA_BUCKET / $MODEL_BUCKET / $TEMP_BUCKET / $SA"
 ```bash
 gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com \
   aiplatform.googleapis.com storage.googleapis.com pubsub.googleapis.com compute.googleapis.com \
-  iam.googleapis.com cloudresourcemanager.googleapis.com
+  iam.googleapis.com cloudresourcemanager.googleapis.com secretmanager.googleapis.com
 ```
+
+(Secret Manager is needed because the GitHub connection in step 7 stores its token there.)
 
 ## 4. Create the Docker image repository and the three buckets
 
@@ -104,13 +106,17 @@ gcloud storage buckets notifications create gs://$MODEL_BUCKET --topic=coffee-mo
 1. Console → **Cloud Build → Repositories → 2nd gen** tab → **Create host connection**.
 2. Provider **GitHub**, region **us-central1**, name e.g. `github`. Click *Connect*, sign in to
    GitHub and install the Google Cloud Build app on your `coffee-mlops` repository.
+   If it offers an *existing installation*, only pick it when it belongs to the GitHub account
+   that owns the repository; otherwise choose *Install in a new account*. If asked to grant the
+   Secret Manager Admin role to the Cloud Build service agent, click *Grant*.
 3. Back on the Repositories page, click **Link repository**, choose the connection and your
    `coffee-mlops` repo.
 
 ## 8. Create the four triggers (console)
 
-Console → **Cloud Build → Triggers**. Set **Region: us-central1** at the top of the page, then
-click **Create trigger** for each row below. For all four:
+Console → **Cloud Build → Triggers** → **Create trigger** for each row below, choosing
+**Region: us-central1** inside the form. Create `deploy-on-new-model` **before** the first training
+run, otherwise the first "new model" message has no listener. For all four:
 
 - **Repository generation:** 2nd gen, with your repo selected.
 - **Service account:** choose `…-compute@developer.gserviceaccount.com`.
