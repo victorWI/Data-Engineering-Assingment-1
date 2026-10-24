@@ -90,7 +90,7 @@ done
 gcloud pubsub topics create coffee-model-updates
 
 # allow Cloud Storage to publish to that topic
-GCS_AGENT=$(gcloud storage service-agent --project=$PROJECT_ID)
+GCS_AGENT=service-$PROJECT_NUMBER@gs-project-accounts.iam.gserviceaccount.com
 gcloud pubsub topics add-iam-policy-binding coffee-model-updates \
   --member=serviceAccount:$GCS_AGENT --role=roles/pubsub.publisher
 
